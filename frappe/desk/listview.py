@@ -30,7 +30,7 @@ def set_list_settings(doctype, values):
 
 
 @frappe.whitelist()
-def get_group_by_count(doctype: str, current_filters: str, field: str) -> list[dict]:
+def get_group_by_count(doctype: str, current_filters: str, field: str, limit:int=50) -> list[dict]:
 	current_filters = frappe.parse_json(current_filters)
 
 	if field == "assigned_to":
@@ -56,7 +56,7 @@ def get_group_by_count(doctype: str, current_filters: str, field: str) -> list[d
 			)
 			.groupby(ToDo.allocated_to)
 			.orderby(count, order=Order.desc)
-			.limit(50)
+			.limit(limit)
 			.run(as_dict=True)
 		)
 
@@ -71,7 +71,7 @@ def get_group_by_count(doctype: str, current_filters: str, field: str) -> list[d
 		group_by=f"`tab{doctype}`.{field}",
 		fields=["count(*) as count", f"`{field}` as name"],
 		order_by="count desc",
-		limit=50,
+		limit=limit,
 	)
 
 	# Add in title if it's a link field and `show_title_field_in_link` is set

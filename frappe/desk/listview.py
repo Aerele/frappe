@@ -30,7 +30,7 @@ def set_list_settings(doctype, values):
 
 
 @frappe.whitelist()
-def get_group_by_count(doctype: str, current_filters: str, field: str, limit:int=50) -> list[dict]:
+def get_group_by_count(doctype: str, current_filters: str, field: str, limit: int = 50) -> list[dict]:
 	current_filters = frappe.parse_json(current_filters)
 
 	if field == "assigned_to":

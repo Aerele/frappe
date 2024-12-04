@@ -7,6 +7,7 @@ from frappe.utils.defaults import get_not_null_defaults
 
 SPECIAL_CHAR_PATTERN = re.compile(r"[\W]", flags=re.UNICODE)
 VARCHAR_CAST_PATTERN = re.compile(r"varchar\(([\d]+)\)")
+STARTS_WITH_NUM_PATTERN = re.compile(r"^\d")
 
 
 class InvalidColumnName(frappe.ValidationError):
@@ -350,6 +351,14 @@ def validate_column_name(n):
 		frappe.throw(
 			_("Fieldname {0} cannot have special characters like {1}").format(
 				frappe.bold(cstr(n)), special_characters
+			),
+			frappe.db.InvalidColumnName,
+		)
+	if starts_with_number := STARTS_WITH_NUM_PATTERN.findall(n):
+		starts_with_number = ", ".join(f'"{c}"' for c in starts_with_number)
+		frappe.throw(
+			_("Fieldname {0} cannot start with integer values like {1}").format(
+				frappe.bold(cstr(n)), starts_with_number
 			),
 			frappe.db.InvalidColumnName,
 		)

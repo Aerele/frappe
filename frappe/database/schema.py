@@ -1,4 +1,5 @@
 import re
+from string import digits
 
 import frappe
 from frappe import _
@@ -7,7 +8,6 @@ from frappe.utils.defaults import get_not_null_defaults
 
 SPECIAL_CHAR_PATTERN = re.compile(r"[\W]", flags=re.UNICODE)
 VARCHAR_CAST_PATTERN = re.compile(r"varchar\(([\d]+)\)")
-STARTS_WITH_NUM_PATTERN = re.compile(r"^\d")
 
 
 class InvalidColumnName(frappe.ValidationError):
@@ -354,12 +354,9 @@ def validate_column_name(n):
 			),
 			frappe.db.InvalidColumnName,
 		)
-    from string import digits
-    if n[0] in digits:
+	if n[0] in digits:
 		frappe.throw(
-			_("Fieldname {0} cannot start with integer values like {1}").format(
-				frappe.bold(cstr(n)), n[0]
-			),
+			_("Fieldname {0} cannot start with integer values like {1}").format(frappe.bold(cstr(n)), n[0]),
 			frappe.db.InvalidColumnName,
 		)
 	return n

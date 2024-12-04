@@ -354,11 +354,11 @@ def validate_column_name(n):
 			),
 			frappe.db.InvalidColumnName,
 		)
-	if starts_with_number := STARTS_WITH_NUM_PATTERN.findall(n):
-		starts_with_number = ", ".join(f'"{c}"' for c in starts_with_number)
+    from string import digits
+    if n[0] in digits:
 		frappe.throw(
 			_("Fieldname {0} cannot start with integer values like {1}").format(
-				frappe.bold(cstr(n)), starts_with_number
+				frappe.bold(cstr(n)), n[0]
 			),
 			frappe.db.InvalidColumnName,
 		)

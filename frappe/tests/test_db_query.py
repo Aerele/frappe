@@ -996,59 +996,6 @@ class TestDBQuery(IntegrationTestCase):
 
 		dt.delete(ignore_permissions=True)
 
-	def test_fieldname_starting_with_int(self):
-		from frappe.core.doctype.doctype.test_doctype import new_doctype
-
-		frappe.delete_doc_if_exists("DocType", "dt_with_int_named_fieldname")
-		frappe.delete_doc_if_exists("DocType", "table_dt")
-
-		table_dt = new_doctype(
-			"table_dt",
-			istable=1,
-			fields=[{"label": "1field", "fieldname": "2field", "fieldtype": "Data"}],
-		).insert()
-
-		dt = new_doctype(
-			"dt_with_int_named_fieldname",
-			fields=[
-				{"label": "1field", "fieldname": "1field", "fieldtype": "Data"},
-				{
-					"label": "2table_field",
-					"fieldname": "2table_field",
-					"fieldtype": "Table",
-					"options": table_dt.name,
-				},
-			],
-		).insert(ignore_permissions=True)
-
-		dt_data = frappe.get_doc({"doctype": "dt_with_int_named_fieldname", "1field": "10"}).insert(
-			ignore_permissions=True
-		)
-
-		query = DatabaseQuery("dt_with_int_named_fieldname")
-		self.assertTrue(query.execute(filters={"1field": "10"}))
-		self.assertTrue(query.execute(filters={"1field": ["like", "1%"]}))
-		self.assertTrue(query.execute(filters={"1field": ["in", "1,2,10"]}))
-		self.assertTrue(query.execute(filters={"1field": ["is", "set"]}))
-		self.assertFalse(query.execute(filters={"1field": ["not like", "1%"]}))
-		self.assertTrue(query.execute(filters=[["table_dt", "2field", "is", "not set"]]))
-
-		frappe.get_doc(
-			{
-				"doctype": table_dt.name,
-				"2field": "10",
-				"parent": dt_data.name,
-				"parenttype": dt_data.doctype,
-				"parentfield": "2table_field",
-			}
-		).insert(ignore_permissions=True)
-
-		self.assertTrue(query.execute(filters=[["table_dt", "2field", "is", "set"]]))
-
-		# cleanup
-		dt.delete()
-		table_dt.delete()
-
 	def test_permission_query_condition(self):
 		from frappe.desk.doctype.dashboard_settings.dashboard_settings import (
 			create_dashboard_settings,

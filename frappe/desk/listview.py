@@ -30,7 +30,7 @@ def set_list_settings(doctype, values):
 
 
 @frappe.whitelist()
-def get_group_by_count(doctype: str, current_filters: str, field: str, limit: int = 50) -> list[dict]:
+def get_group_by_count(doctype: str, current_filters: str, field: str, limit: int = 1000) -> list[dict]:
 	current_filters = frappe.parse_json(current_filters)
 
 	if field == "assigned_to":
@@ -73,6 +73,21 @@ def get_group_by_count(doctype: str, current_filters: str, field: str, limit: in
 		order_by="count desc",
 		limit=limit,
 	)
+
+	if field == "owner":
+		owner_idx = None
+
+		for idx, item in enumerate(data):
+			if item.name == frappe.session.user:
+				owner_idx = idx
+				break
+
+		if owner_idx:
+			data = [data.pop(owner_idx)] + data[0:49]
+		else:
+			data = data[0:50]
+	else:
+		data = data[0:50]
 
 	# Add in title if it's a link field and `show_title_field_in_link` is set
 	if (field_meta := meta.get_field(field)) and field_meta.fieldtype == "Link":

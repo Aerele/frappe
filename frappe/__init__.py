@@ -51,9 +51,11 @@ from frappe.query_builder.utils import (
 from frappe.utils.caching import request_cache
 from frappe.utils.data import cint, cstr, sbool
 
+from .bench_interface import Bench
+
 # Local application imports
 from .exceptions import *
-from .types.frappedict import _dict
+from .types import Filters, FilterSignature, FilterTuple, _dict
 from .utils.jinja import (
 	get_email_from_template,
 	get_jenv,
@@ -81,10 +83,11 @@ if TYPE_CHECKING:  # pragma: no cover
 
 controllers: dict[str, "Document"] = {}
 local = Local()
+bench = Bench()
 cache: Optional["RedisWrapper"] = None
 STANDARD_USERS = ("Guest", "Administrator")
 
-_qb_patched: dict[str, bool] = {}
+_one_time_setup: dict[str, bool] = {}
 _dev_server = int(sbool(os.environ.get("DEV_SERVER", False)))
 _tune_gc = bool(sbool(os.environ.get("FRAPPE_TUNE_GC", True)))
 
@@ -241,10 +244,11 @@ def init(site: str, sites_path: str = ".", new_site: bool = False, force: bool =
 			"read_only": False,
 		}
 	)
-	local.locked_documents: list["Document"] = []
+	local.locked_documents: list[Document] = []
 	local.test_objects = defaultdict(list)
 
 	local.site = site
+	local.site_name = site  # implicitly scopes bench
 	local.sites_path = sites_path
 	local.site_path = os.path.join(sites_path, site)
 	local.all_apps = None
@@ -266,6 +270,7 @@ def init(site: str, sites_path: str = ".", new_site: bool = False, force: bool =
 	local.valid_columns = {}
 	local.new_doc_templates = {}
 
+	local.request_cache = defaultdict(dict)
 	local.jenv = None
 	local.jloader = None
 	local.cache = {}
@@ -277,10 +282,11 @@ def init(site: str, sites_path: str = ".", new_site: bool = False, force: bool =
 	local.qb.get_query = get_query
 	setup_redis_cache_connection()
 
-	if not _qb_patched.get(local.conf.db_type):
+	if not _one_time_setup.get(local.conf.db_type):
 		patch_query_execute()
 		patch_query_aggregation()
 		_register_fault_handler()
+		_one_time_setup[local.conf.db_type] = True
 
 	setup_module_map(include_all_apps=not (frappe.request or frappe.job or frappe.flags.in_migrate))
 
@@ -929,7 +935,7 @@ def is_whitelisted(method):
 	from frappe.utils import sanitize_html
 
 	is_guest = session["user"] == "Guest"
-	if method not in whitelisted or is_guest and method not in guest_methods:
+	if method not in whitelisted or (is_guest and method not in guest_methods):
 		summary = _("You are not permitted to access this resource.")
 		detail = _("Function {0} is not whitelisted.").format(bold(f"{method.__module__}.{method.__name__}"))
 		msg = f"<details><summary>{summary}</summary>{detail}</details>"
@@ -1374,16 +1380,16 @@ def get_doc(*args: Any, **kwargs: Any) -> "Document":
 	"""
 	import frappe.model.document
 
-	doc = frappe.model.document.get_doc(*args, **kwargs)
-
-	# Replace cache if stale one exists
-	if not kwargs.get("for_update") and (key := can_cache_doc(args)) and cache.exists(key):
-		_set_document_in_cache(key, doc)
-
-	return doc
+	return frappe.model.document.get_doc(*args, **kwargs)
 
 
-def get_last_doc(doctype, filters=None, order_by="creation desc", *, for_update=False):
+def get_last_doc(
+	doctype,
+	filters: FilterSignature | None = None,
+	order_by="creation desc",
+	*,
+	for_update=False,
+):
 	"""Get last created document of this type."""
 	d = get_all(doctype, filters=filters, limit_page_length=1, order_by=order_by, pluck="name")
 	if d:
@@ -2380,7 +2386,9 @@ loggers: dict[str, "Logger"] = {}
 log_level: int | None = None
 
 
-def logger(module=None, with_more_info=False, allow_site=True, filter=None, max_size=100_000, file_count=20):
+def logger(
+	module=None, with_more_info=False, allow_site=True, filter=None, max_size=100_000, file_count=20
+) -> "Logger":
 	"""Return a python logger that uses StreamHandler."""
 	from frappe.utils.logger import get_logger
 
